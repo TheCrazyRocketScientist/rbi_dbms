@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import pymysql
+import sqlalchemy
 
 
 root = "RBI_Data"
@@ -12,12 +13,16 @@ root_path = os.path.join(os.getcwd(),root)
 os.chdir(root_path)
 folders  = [year for year in os.listdir() if year.isdigit()]
 
+user = "root"
+password = "2102005"
+port = 3306
+host = "localhost"
 
 conn = pymysql.connect(
-    host="localhost",
-    port=3306,         
-    user="root",
-    password="2102005",
+    user = user,
+    password = password,
+    port = port,
+    host = host,
     charset="utf8mb4",
     autocommit=True
 )
@@ -34,16 +39,18 @@ try:
         new_db_name = f"rbi_metric_{metric}"
         create_query = f"CREATE DATABASE `{new_db_name}`;"
         cursor.execute(create_query)
-        
-        use_query = f"USE `{new_db_name}`;"
-        cursor.execute(use_query)
 
+    print(f"Database Created: {new_db_name}")
+        
 except Exception as e:
     print(e)
 
+print(f"mysql+pymysql://{user}:{password}@{host}/{new_db_name}")
+engine = sqlalchemy.create_engine(f"mysql+pymysql://{user}:{password}@{host}/{new_db_name}")
+
 
 try:
-    with conn.cursor() as cursor:
+    with engine.connect() as connection:
         
         for folder in folders:
             current_path = os.path.join(root_path,folder)
@@ -70,20 +77,7 @@ try:
                 df.columns = neft_headers
                 df = df.reset_index(drop=True)
 
-                query =  f"""
-                    CREATE TABLE `{metric}_{year}_{folder}` (
-                        sr_no INT,
-                        bank_name VARCHAR(255),
-                        no_of_outward_transactions BIGINT,
-                        amount_outward DOUBLE,
-                        no_of_inward_transactions BIGINT,
-                        amount_inward DOUBLE
-                    );
-                """
-
-                cursor.execute(query)
-                print(query)
-
+                df.to_sql(f"{metric}_{year}_{folder}",con=connection,if_exists="replace",index=False)
 except Exception as e:
     print(e)
 
